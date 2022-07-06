@@ -7,7 +7,7 @@
 /dataSources/
 /dataSources.local.xml
 .idea/
-.vendor/
+vendor/
 config.env
 config.yml
 main
