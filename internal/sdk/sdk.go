@@ -35,7 +35,7 @@ func NewSDK(cnf *config.RobotConfig) *SDK {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-	defer conn.Close()
+	//defer conn.Close()
 	return &SDK{
 		Ctx:         ctx,
 		Conn:        conn,

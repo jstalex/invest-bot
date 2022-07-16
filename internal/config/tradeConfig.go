@@ -6,13 +6,16 @@ import (
 	"os"
 )
 
-type tradeConfig struct {
-	Tradeinstrument string `yaml:"figi"`
-	AccountID       string `yaml:"id"`
+type TradeConfig struct {
+	TradeInstruments []string `yaml:"instruments"`
+	AccountID        string   `yaml:"id"`
+	Strategy         string   `yaml:"strategy"`
+	Period           int      `yaml:"period"`
+	Window           int      `yaml:"window"`
 }
 
-func NewTradeConfig(filename string) *tradeConfig {
-	var t tradeConfig
+func LoadTradeConfig(filename string) *TradeConfig {
+	var t TradeConfig
 	input, err := os.ReadFile(filename)
 	if err != nil {
 		log.Println(err)
