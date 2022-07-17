@@ -12,7 +12,7 @@ type RobotConfig struct {
 	EndPoint string
 }
 
-func NewRobotConfig(filename string) *RobotConfig {
+func LoadRobotConfig(filename string) *RobotConfig {
 	var c RobotConfig
 	if err := godotenv.Load(filename); err != nil {
 		log.Print("No .env file found")

@@ -14,11 +14,13 @@ const (
 )
 
 func main() {
-	rc := config.NewRobotConfig("config.env")
+	rc := config.LoadRobotConfig("config.env")
 	tc := config.LoadTradeConfig("config.yml")
-	sdk := s.NewSDK(rc)
-	traders := trader.InitTradersFromConfig(tc)
-	for _, t := range traders {
-		t.TestOnHisoricalData(sdk, "2021-10-12", "2021-10-13")
-	}
+	sdk := s.NewSDK(rc, tc)
+	traders := trader.LoadTradersFromConfig(sdk, tc)
+
+	traders[""].RunOnSandbox(sdk)
+	/*for _, t := range traders {
+		t.TestOnHisoricalData(sdk, "2022-07-13", "2022-07-14")
+	}*/
 }

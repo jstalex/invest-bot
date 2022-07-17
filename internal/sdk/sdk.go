@@ -16,6 +16,7 @@ type SDK struct {
 	Ctx         context.Context
 	Conn        *grpc.ClientConn
 	RobotConfig *config.RobotConfig
+	TradeConfig *config.TradeConfig
 
 	Sandbox     pb.SandboxServiceClient
 	Instruments pb.InstrumentsServiceClient
@@ -24,28 +25,37 @@ type SDK struct {
 	Orders      pb.OrdersServiceClient
 	Stoporder   pb.StopOrdersServiceClient
 	Users       pb.UsersServiceClient
+
+	MarketStream pb.MarketDataStreamService_MarketDataStreamClient
 }
 
-func NewSDK(cnf *config.RobotConfig) *SDK {
-	ctx := context.WithValue(context.Background(), "authorization", "Bearer "+cnf.Token)
+func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
+	ctx := context.WithValue(context.Background(), "authorization", "Bearer "+rc.Token)
 
-	conn, err := grpc.Dial(cnf.EndPoint,
+	conn, err := grpc.Dial(rc.EndPoint,
 		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
-		grpc.WithPerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{AccessToken: cnf.Token})))
+		grpc.WithPerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{AccessToken: rc.Token})))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-	//defer conn.Close()
+
+	streamClient := pb.NewMarketDataStreamServiceClient(conn)
+	stream, err := streamClient.MarketDataStream(ctx)
+	if err != nil {
+		log.Println("marketdata stream error", err)
+	}
 	return &SDK{
-		Ctx:         ctx,
-		Conn:        conn,
-		RobotConfig: cnf,
-		Sandbox:     pb.NewSandboxServiceClient(conn),
-		Instruments: pb.NewInstrumentsServiceClient(conn),
-		Marketdata:  pb.NewMarketDataServiceClient(conn),
-		Operations:  pb.NewOperationsServiceClient(conn),
-		Orders:      pb.NewOrdersServiceClient(conn),
-		Stoporder:   pb.NewStopOrdersServiceClient(conn),
-		Users:       pb.NewUsersServiceClient(conn),
+		Ctx:          ctx,
+		Conn:         conn,
+		RobotConfig:  rc,
+		TradeConfig:  tc,
+		Sandbox:      pb.NewSandboxServiceClient(conn),
+		Instruments:  pb.NewInstrumentsServiceClient(conn),
+		Marketdata:   pb.NewMarketDataServiceClient(conn),
+		Operations:   pb.NewOperationsServiceClient(conn),
+		Orders:       pb.NewOrdersServiceClient(conn),
+		Stoporder:    pb.NewStopOrdersServiceClient(conn),
+		Users:        pb.NewUsersServiceClient(conn),
+		MarketStream: stream,
 	}
 }

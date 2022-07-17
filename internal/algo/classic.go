@@ -6,22 +6,30 @@ func NewClassicStrategy(w int) (*techan.RuleStrategy, *techan.TimeSeries, *techa
 	series := techan.NewTimeSeries()
 	record := techan.NewTradingRecord()
 
-	indicator := techan.NewClosePriceIndicator(series)
-	entryConstant := techan.NewConstantIndicator(21600)
-	exitConstant := techan.NewConstantIndicator(21400)
+	lowPrices := techan.NewLowPriceIndicator(series)
+	highPrices := techan.NewHighPriceIndicator(series)
 
-	// Is satisfied when the price ema moves above 30 and the current position is new
+	closePrices := techan.NewClosePriceIndicator(series)
+	movingAverage := techan.NewEMAIndicator(closePrices, w)
+
+	aroonDownIndicator := techan.NewAroonDownIndicator(lowPrices, w)
+	aroonUpIndicator := techan.NewAroonUpIndicator(highPrices, w)
+
+	customEntry := techan.And(techan.NewCrossUpIndicatorRule(aroonDownIndicator, aroonUpIndicator),
+		techan.NewCrossUpIndicatorRule(movingAverage, closePrices))
+
+	customExit := techan.And(techan.NewCrossDownIndicatorRule(aroonUpIndicator, aroonDownIndicator),
+		techan.NewCrossDownIndicatorRule(closePrices, movingAverage))
+
 	entryRule := techan.And(
-		techan.NewCrossUpIndicatorRule(entryConstant, indicator),
+		customEntry,
 		techan.PositionNewRule{})
-
-	// Is satisfied when the price ema moves below 10 and the current position is open
 	exitRule := techan.And(
-		techan.NewCrossDownIndicatorRule(indicator, exitConstant),
+		customExit,
 		techan.PositionOpenRule{})
 
 	ruleStrategy := &techan.RuleStrategy{
-		UnstablePeriod: w, // Period before which ShouldEnter and ShouldExit will always return false
+		UnstablePeriod: w,
 		EntryRule:      entryRule,
 		ExitRule:       exitRule,
 	}

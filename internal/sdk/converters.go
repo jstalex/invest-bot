@@ -34,3 +34,18 @@ func (s *SDK) HistoricalCandleToTechan(hc *pb.HistoricCandle) *techan.Candle {
 func (s *SDK) QuotationToFloat(src *pb.Quotation) float64 {
 	return float64(src.Units) + float64(src.Nano)*math.Pow10(-9)
 }
+
+func (s *SDK) MoneyValueToFloat(src *pb.MoneyValue) float64 {
+	return float64(src.Units) + float64(src.Nano)*math.Pow10(-9)
+}
+
+func (s *SDK) PBCandleToTechan(pbc *pb.Candle) *techan.Candle {
+	period := techan.NewTimePeriod(pbc.Time.AsTime(), time.Minute)
+	candle := techan.NewCandle(period)
+	candle.OpenPrice = big.NewDecimal(s.QuotationToFloat(pbc.Open))
+	candle.ClosePrice = big.NewDecimal(s.QuotationToFloat(pbc.Close))
+	candle.MaxPrice = big.NewDecimal(s.QuotationToFloat(pbc.High))
+	candle.MinPrice = big.NewDecimal(s.QuotationToFloat(pbc.Low))
+
+	return candle
+}
