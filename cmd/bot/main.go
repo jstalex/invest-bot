@@ -7,13 +7,6 @@ import (
 	"invest-bot/internal/trader"
 )
 
-type OrderSide int
-
-const (
-	BUY OrderSide = iota
-	SELL
-)
-
 func main() {
 	rc := config.LoadRobotConfig("config.env")
 	tc := config.LoadTradeConfig("config.yml")
