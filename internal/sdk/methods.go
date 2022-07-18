@@ -17,10 +17,10 @@ func (s *SDK) GetHistoricalCandles(figi string, period int, from string, to stri
 	}
 	return response.GetCandles()
 }
-func (s *SDK) PostSandboxOrder(figi string, direction pb.OrderDirection) (float64, bool) {
+func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, bool) {
 	resp, err := s.Sandbox.PostSandboxOrder(s.Ctx, &pb.PostOrderRequest{
 		Figi:      figi,
-		Quantity:  1,
+		Quantity:  quantity,
 		Price:     nil,
 		Direction: direction,
 		AccountId: s.TradeConfig.AccountID,

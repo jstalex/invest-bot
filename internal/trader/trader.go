@@ -72,7 +72,7 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 	// если пришедшая свеча удочно добавлена, то принимаем дальнейшее решение
 	if t.series.AddCandle(t.sdk.PBCandleToTechan(inputCandle)) {
 		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High)) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, pb.OrderDirection_ORDER_DIRECTION_BUY)
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1, pb.OrderDirection_ORDER_DIRECTION_BUY)
 			if ok {
 				t.addTrade(BUY, executedPrice, executedPrice, time.Now())
 				log.Println("Buy order executed with figi ", t.Figi)
@@ -80,7 +80,7 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 				log.Println("buy order error")
 			}
 		} else if t.selectOperation() == SELL && t.possibleToSell(1) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, pb.OrderDirection_ORDER_DIRECTION_SELL)
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1, pb.OrderDirection_ORDER_DIRECTION_SELL)
 			if ok {
 				t.addTrade(SELL, executedPrice, executedPrice, time.Now())
 				log.Println("sell order executed with figi ", t.Figi)
