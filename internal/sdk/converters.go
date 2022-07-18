@@ -27,7 +27,6 @@ func (s *SDK) HistoricalCandleToTechan(hc *pb.HistoricCandle) *techan.Candle {
 	candle.ClosePrice = big.NewDecimal(s.QuotationToFloat(hc.Close))
 	candle.MaxPrice = big.NewDecimal(s.QuotationToFloat(hc.High))
 	candle.MinPrice = big.NewDecimal(s.QuotationToFloat(hc.Low))
-
 	return candle
 }
 

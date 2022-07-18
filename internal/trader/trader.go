@@ -57,6 +57,8 @@ func NewTrader(i int, cnf *config.TradeConfig, s *s.SDK) *Trader {
 		sdk:          s,
 	}
 }
+
+// LoadTradersFromConfig - создание экземпляров трейдеров для каждого инструмента из конфига
 func LoadTradersFromConfig(s *s.SDK, cnf *config.TradeConfig) map[string]*Trader {
 	traders := make(map[string]*Trader)
 	for i, f := range cnf.TradeInstruments {
@@ -65,10 +67,12 @@ func LoadTradersFromConfig(s *s.SDK, cnf *config.TradeConfig) map[string]*Trader
 	return traders
 }
 
+// HandleIncomingCandle - обработка свечи из Marketdata stream
 func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
+	// если пришедшая свеча удочно добавлена, то принимаем дальнейшее решение
 	if t.series.AddCandle(t.sdk.PBCandleToTechan(inputCandle)) {
 		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High)) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1)
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, pb.OrderDirection_ORDER_DIRECTION_BUY)
 			if ok {
 				t.addTrade(BUY, executedPrice, executedPrice, time.Now())
 				log.Println("Buy order executed with figi ", t.Figi)
@@ -76,7 +80,7 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 				log.Println("buy order error")
 			}
 		} else if t.selectOperation() == SELL && t.possibleToSell(1) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1)
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, pb.OrderDirection_ORDER_DIRECTION_SELL)
 			if ok {
 				t.addTrade(SELL, executedPrice, executedPrice, time.Now())
 				log.Println("sell order executed with figi ", t.Figi)
@@ -88,6 +92,8 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 		fmt.Println("candle adding error")
 	}
 }
+
+// принятие решения о покупке/продаже при помощи торговой стратегии
 func (t *Trader) selectOperation() OrderSide {
 	if t.ruleStrategy.ShouldEnter(t.series.LastIndex(), t.record) {
 		return BUY
@@ -98,6 +104,7 @@ func (t *Trader) selectOperation() OrderSide {
 	}
 }
 
+// проврека возможности покупки инструмента на счет песочницы
 func (t *Trader) possibleToBuy(sum float64) bool {
 	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
@@ -110,9 +117,11 @@ func (t *Trader) possibleToBuy(sum float64) bool {
 	if err != nil {
 		log.Println(err)
 	}
+	// если иструмент доступен для торговли на бирже и хватает денег на его покупку
 	return shareResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= sum
 }
 
+// проверка аозможности продажи инструмента со счета песочницы
 func (t *Trader) possibleToSell(amount int) bool {
 	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
@@ -134,8 +143,11 @@ func (t *Trader) possibleToSell(amount int) bool {
 			break
 		}
 	}
+	// если инструмент доступен для торговли на бирже, есть ли он у нас и достаточно ли для продажи
 	return shareResp.GetInstrument().ApiTradeAvailableFlag && contain && balance >= int64(amount)
 }
+
+// добавляем исполненные поручения в запись
 func (t *Trader) addTrade(side OrderSide, amount float64, price float64, time time.Time) {
 	if side == BUY {
 		t.record.Operate(techan.Order{

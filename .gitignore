@@ -9,6 +9,6 @@
 .idea/
 
 config.env
-config.yml
+config.yaml
 main
 /vendor/

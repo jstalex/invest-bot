@@ -8,7 +8,6 @@ import (
 )
 
 func (t *Trader) TestOnHisoricalData(sdk *s.SDK, from string, to string) {
-
 	dataset := sdk.GetHistoricalCandles(t.Figi, t.Period, from, to)
 	for _, hc := range dataset {
 		if t.series.AddCandle(sdk.HistoricalCandleToTechan(hc)) {

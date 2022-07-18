@@ -29,7 +29,6 @@ type SDK struct {
 
 func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
 	ctx := context.WithValue(context.Background(), "authorization", "Bearer "+rc.Token)
-
 	conn, err := grpc.Dial(rc.EndPoint,
 		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})),
 		grpc.WithPerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{AccessToken: rc.Token})))

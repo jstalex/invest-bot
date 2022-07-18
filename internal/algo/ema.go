@@ -6,15 +6,15 @@ func NewEMAStrategy(w int) (*techan.RuleStrategy, *techan.TimeSeries, *techan.Tr
 	series := techan.NewTimeSeries()
 	record := techan.NewTradingRecord()
 
-	closePrices := techan.NewClosePriceIndicator(series)    // отсеивает High, Low, Open, на выходе только Close
-	movingAverage := techan.NewEMAIndicator(closePrices, w) // Создает экспоненциальное среднее с окном в n свечей
+	closePrices := techan.NewClosePriceIndicator(series)
+	movingAverage := techan.NewEMAIndicator(closePrices, w)
 
 	entryRule := techan.And( // правило входа
-		techan.NewCrossUpIndicatorRule(movingAverage, closePrices), // когда свеча закрытия пересечет EMA (станет выше EMA)
-		techan.PositionNewRule{})                                   // и сделок не открыто — мы покупаем
+		techan.NewCrossUpIndicatorRule(movingAverage, closePrices),
+		techan.PositionNewRule{})
 	exitRule := techan.And( // правило выхода
-		techan.NewCrossDownIndicatorRule(closePrices, movingAverage), // когда свеча закроется ниже EMA
-		techan.PositionOpenRule{})                                    // и сделка открыта — продаем
+		techan.NewCrossDownIndicatorRule(closePrices, movingAverage),
+		techan.PositionOpenRule{})
 	ruleStrategy := &techan.RuleStrategy{
 		UnstablePeriod: w,
 		EntryRule:      entryRule,
