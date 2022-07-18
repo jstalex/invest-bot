@@ -2,6 +2,7 @@ package main
 
 import (
 	"invest-bot/internal/config"
+	"invest-bot/internal/engine"
 	s "invest-bot/internal/sdk"
 	"invest-bot/internal/trader"
 )
@@ -18,9 +19,6 @@ func main() {
 	tc := config.LoadTradeConfig("config.yml")
 	sdk := s.NewSDK(rc, tc)
 	traders := trader.LoadTradersFromConfig(sdk, tc)
-
-	traders[""].RunOnSandbox(sdk)
-	/*for _, t := range traders {
-		t.TestOnHisoricalData(sdk, "2022-07-13", "2022-07-14")
-	}*/
+	engine.RunOnSandbox(sdk, traders)
+	//engine.TestOnHisoryData(sdk, traders, "2022-07-14", "2022-07-15")
 }

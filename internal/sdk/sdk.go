@@ -25,8 +25,6 @@ type SDK struct {
 	Orders      pb.OrdersServiceClient
 	Stoporder   pb.StopOrdersServiceClient
 	Users       pb.UsersServiceClient
-
-	MarketStream pb.MarketDataStreamService_MarketDataStreamClient
 }
 
 func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
@@ -38,24 +36,17 @@ func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-
-	streamClient := pb.NewMarketDataStreamServiceClient(conn)
-	stream, err := streamClient.MarketDataStream(ctx)
-	if err != nil {
-		log.Println("marketdata stream error", err)
-	}
 	return &SDK{
-		Ctx:          ctx,
-		Conn:         conn,
-		RobotConfig:  rc,
-		TradeConfig:  tc,
-		Sandbox:      pb.NewSandboxServiceClient(conn),
-		Instruments:  pb.NewInstrumentsServiceClient(conn),
-		Marketdata:   pb.NewMarketDataServiceClient(conn),
-		Operations:   pb.NewOperationsServiceClient(conn),
-		Orders:       pb.NewOrdersServiceClient(conn),
-		Stoporder:    pb.NewStopOrdersServiceClient(conn),
-		Users:        pb.NewUsersServiceClient(conn),
-		MarketStream: stream,
+		Ctx:         ctx,
+		Conn:        conn,
+		RobotConfig: rc,
+		TradeConfig: tc,
+		Sandbox:     pb.NewSandboxServiceClient(conn),
+		Instruments: pb.NewInstrumentsServiceClient(conn),
+		Marketdata:  pb.NewMarketDataServiceClient(conn),
+		Operations:  pb.NewOperationsServiceClient(conn),
+		Orders:      pb.NewOrdersServiceClient(conn),
+		Stoporder:   pb.NewStopOrdersServiceClient(conn),
+		Users:       pb.NewUsersServiceClient(conn),
 	}
 }
