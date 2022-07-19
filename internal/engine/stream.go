@@ -33,8 +33,9 @@ func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	if err != nil {
 		log.Println(err)
 	}
-	// слушаем стрим и вызываем обработку свечи у соответсвующего иструменту трейдера
+	// слушаем стрим и вызываем обработку свечи у, соответсвующего инструменту, трейдера
 	stopTime := time.Now().Add(time.Duration(sdk.TradeConfig.TradingDuration) * time.Minute)
+	// слушаем стрим определенное из конфига время
 	for time.Now().Before(stopTime) {
 		resp, err := marketStream.Recv()
 		if err != nil {
@@ -42,6 +43,7 @@ func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 		}
 		if resp.GetCandle() != nil {
 			if _, ok := subscribers[resp.GetCandle().GetFigi()]; ok {
+				// вызываем обработку свечи у трейдера
 				go subscribers[resp.GetCandle().GetFigi()].HandleIncomingCandle(resp.GetCandle())
 			} else {
 				log.Println("not found subscriber to instrument ", resp.GetCandle().Figi)
@@ -49,6 +51,6 @@ func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 		} else {
 			log.Println("response do not contain a candle")
 		}
-		time.Sleep(time.Second)
 	}
+	time.Sleep(time.Second)
 }

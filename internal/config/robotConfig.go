@@ -15,7 +15,7 @@ type RobotConfig struct {
 func LoadRobotConfig(filename string) *RobotConfig {
 	var c RobotConfig
 	if err := godotenv.Load(filename); err != nil {
-		log.Print("No .env file found")
+		log.Println("No .env file found")
 	}
 	c.Token = stringFromEnv("TINKOFF_TOKEN")
 	c.EndPoint = stringFromEnv("END_POINT")
@@ -25,7 +25,7 @@ func LoadRobotConfig(filename string) *RobotConfig {
 func stringFromEnv(key string) string {
 	answer, err := os.LookupEnv(key)
 	if !err {
-		log.Print("robot config reading error")
+		log.Println("robot config reading error")
 	}
 	return answer
 }

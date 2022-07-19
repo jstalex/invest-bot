@@ -45,6 +45,5 @@ func (s *SDK) PBCandleToTechan(pbc *pb.Candle) *techan.Candle {
 	candle.ClosePrice = big.NewDecimal(s.QuotationToFloat(pbc.Close))
 	candle.MaxPrice = big.NewDecimal(s.QuotationToFloat(pbc.High))
 	candle.MinPrice = big.NewDecimal(s.QuotationToFloat(pbc.Low))
-
 	return candle
 }

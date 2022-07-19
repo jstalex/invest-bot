@@ -1,7 +1,6 @@
 package trader
 
 import (
-	"fmt"
 	"github.com/sdcoffey/big"
 	"github.com/sdcoffey/techan"
 	pb "invest-bot/api/proto"
@@ -89,7 +88,7 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 			}
 		}
 	} else {
-		fmt.Println("candle adding error")
+		log.Println("candle adding error")
 	}
 }
 

@@ -2,7 +2,6 @@ package config
 
 import (
 	"gopkg.in/yaml.v3"
-	//s "invest-bot/internal/sdk"
 	"log"
 	"os"
 )

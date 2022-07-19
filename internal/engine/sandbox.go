@@ -8,15 +8,19 @@ import (
 	"log"
 )
 
+// RunOnSandbox - Запуск робота в песочнице
 func RunOnSandbox(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	initailBalance := sdk.GetSandboxMoneyBalance()
+	// подписаться на свечи инструментов
 	CandlesFromStream(sdk, subscribers)
+	// в конце торговли закрываем все активные позиции
 	allPositionsAreClosed := finishTradingSession(sdk)
 	if allPositionsAreClosed {
 		log.Println("Trading session successful finished")
 	} else {
 		log.Println("error in final selling of instruments")
 	}
+	// вычисляем разницу между начальным балансом на счете и итоговым
 	balanceAfterTrading := sdk.GetSandboxMoneyBalance()
 	fmt.Println("Profit after trading session =", balanceAfterTrading-initailBalance, "RUB")
 }
