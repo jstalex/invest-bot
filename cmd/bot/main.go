@@ -12,7 +12,7 @@ func main() {
 	tc := config.LoadTradeConfig("config.yaml")
 	sdk := s.NewSDK(rc, tc)
 	// если аккаунта в файле конфига нет, то он создастся и запишется в файл
-	tc.CreateAccountID(sdk)
+	sdk.CreateSandboxAccount(tc)
 	traders := trader.LoadTradersFromConfig(sdk, tc)
 	engine.RunOnSandbox(sdk, traders)
 	//engine.TestOnHisoryData(sdk, traders, "2022-07-14", "2022-07-15")
