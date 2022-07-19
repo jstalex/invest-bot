@@ -34,9 +34,8 @@ func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 		log.Println(err)
 	}
 	// слушаем стрим и вызываем обработку свечи у соответсвующего иструменту трейдера
-	stop := time.Now().Add(5 * time.Minute)
-
-	for time.Now().Before(stop) {
+	stopTime := time.Now().Add(time.Duration(sdk.TradeConfig.TradingDuration) * time.Minute)
+	for time.Now().Before(stopTime) {
 		resp, err := marketStream.Recv()
 		if err != nil {
 			log.Println(err)

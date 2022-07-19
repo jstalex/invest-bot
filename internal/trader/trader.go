@@ -71,16 +71,16 @@ func LoadTradersFromConfig(s *s.SDK, cnf *config.TradeConfig) map[string]*Trader
 func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 	// если пришедшая свеча удочно добавлена, то принимаем дальнейшее решение
 	if t.series.AddCandle(t.sdk.PBCandleToTechan(inputCandle)) {
-		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High)) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1, pb.OrderDirection_ORDER_DIRECTION_BUY)
+		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High), t.sdk.TradeConfig.LotsQuantity) {
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, t.sdk.TradeConfig.LotsQuantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
 			if ok {
 				t.addTrade(BUY, executedPrice, executedPrice, time.Now())
 				log.Println("Buy order executed with figi ", t.Figi)
 			} else {
 				log.Println("buy order error")
 			}
-		} else if t.selectOperation() == SELL && t.possibleToSell(1) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, 1, pb.OrderDirection_ORDER_DIRECTION_SELL)
+		} else if t.selectOperation() == SELL && t.possibleToSell(t.sdk.TradeConfig.LotsQuantity) {
+			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, t.sdk.TradeConfig.LotsQuantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
 			if ok {
 				t.addTrade(SELL, executedPrice, executedPrice, time.Now())
 				log.Println("sell order executed with figi ", t.Figi)
@@ -105,7 +105,8 @@ func (t *Trader) selectOperation() OrderSide {
 }
 
 // проврека возможности покупки инструмента на счет песочницы
-func (t *Trader) possibleToBuy(sum float64) bool {
+func (t *Trader) possibleToBuy(price float64, quantity int64) bool {
+	var totalSum float64
 	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
 		Id:     t.Figi,
@@ -117,12 +118,14 @@ func (t *Trader) possibleToBuy(sum float64) bool {
 	if err != nil {
 		log.Println(err)
 	}
+	// цена 1 инструмента * количество инструментов в лоте * кол-во лотов
+	totalSum = price * float64(quantity) * float64(shareResp.GetInstrument().Lot)
 	// если иструмент доступен для торговли на бирже и хватает денег на его покупку
-	return shareResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= sum
+	return shareResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= totalSum
 }
 
 // проверка аозможности продажи инструмента со счета песочницы
-func (t *Trader) possibleToSell(amount int) bool {
+func (t *Trader) possibleToSell(quantity int64) bool {
 	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
 		Id:     t.Figi,
@@ -135,20 +138,20 @@ func (t *Trader) possibleToSell(amount int) bool {
 		log.Println(err)
 	}
 	contain := false
-	var balance int64
+	var LotsOnBalance int64
 	for _, p := range positionsResp.Securities {
 		if p.Figi == t.Figi {
 			contain = true
-			balance = p.Balance
+			LotsOnBalance = p.Balance / int64(shareResp.GetInstrument().Lot)
 			break
 		}
 	}
 	// если инструмент доступен для торговли на бирже, есть ли он у нас и достаточно ли для продажи
-	return shareResp.GetInstrument().ApiTradeAvailableFlag && contain && balance >= int64(amount)
+	return shareResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= quantity
 }
 
 // добавляем исполненные поручения в запись
-func (t *Trader) addTrade(side OrderSide, amount float64, price float64, time time.Time) {
+func (t *Trader) addTrade(side OrderSide, price float64, amount float64, time time.Time) {
 	if side == BUY {
 		t.record.Operate(techan.Order{
 			Side:          techan.BUY,

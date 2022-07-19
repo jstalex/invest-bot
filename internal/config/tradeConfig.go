@@ -13,6 +13,8 @@ type TradeConfig struct {
 	Strategy         string   `yaml:"strategy"`
 	Period           int      `yaml:"period"`
 	Window           int      `yaml:"window"`
+	TradingDuration  int      `yaml:"duration"`
+	LotsQuantity     int64    `yaml:"lotsQuantity"`
 }
 
 func LoadTradeConfig(filename string) *TradeConfig {
