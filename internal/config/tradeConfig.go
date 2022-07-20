@@ -9,6 +9,7 @@ import (
 type TradeConfig struct {
 	TradeInstruments []string `yaml:"instruments"`
 	AccountID        string   `yaml:"id"`
+	RealAccountID    string   `yaml:"realAccountID"`
 	Strategy         string   `yaml:"strategy"`
 	Period           int      `yaml:"period"`
 	Window           int      `yaml:"window"`

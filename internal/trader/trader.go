@@ -25,7 +25,7 @@ type Trader struct {
 
 	ruleStrategy *techan.RuleStrategy
 	series       *techan.TimeSeries
-	record       *techan.TradingRecord
+	Record       *techan.TradingRecord
 
 	sdk *s.SDK
 }
@@ -52,7 +52,7 @@ func NewTrader(i int, cnf *config.TradeConfig, s *s.SDK) *Trader {
 		Period:       cnf.Period,
 		ruleStrategy: ruleStrategy,
 		series:       series,
-		record:       record,
+		Record:       record,
 		sdk:          s,
 	}
 }
@@ -68,24 +68,12 @@ func LoadTradersFromConfig(s *s.SDK, cnf *config.TradeConfig) map[string]*Trader
 
 // HandleIncomingCandle - обработка свечи из Marketdata stream
 func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
-	// если пришедшая свеча удочно добавлена, то принимаем дальнейшее решение
+	// если пришедшая свеча удачно добавлена, то принимаем дальнейшее решение
 	if t.series.AddCandle(t.sdk.PBCandleToTechan(inputCandle)) {
-		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High), t.sdk.TradeConfig.LotsQuantity) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, t.sdk.TradeConfig.LotsQuantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
-			if ok {
-				t.addTrade(BUY, executedPrice, executedPrice, time.Now())
-				log.Println("Buy order executed with figi ", t.Figi)
-			} else {
-				log.Println("buy order error")
-			}
-		} else if t.selectOperation() == SELL && t.possibleToSell(t.sdk.TradeConfig.LotsQuantity) {
-			executedPrice, ok := t.sdk.PostSandboxOrder(t.Figi, t.sdk.TradeConfig.LotsQuantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
-			if ok {
-				t.addTrade(SELL, executedPrice, executedPrice, time.Now())
-				log.Println("sell order executed with figi ", t.Figi)
-			} else {
-				log.Println("sell order error")
-			}
+		if t.selectOperation() == BUY && t.possibleToBuy(t.sdk.QuotationToFloat(inputCandle.High)) {
+			t.Buy(t.sdk.TradeConfig.LotsQuantity)
+		} else if t.selectOperation() == SELL && t.possibleToSell() {
+			t.Sell(t.sdk.TradeConfig.LotsQuantity)
 		}
 	} else {
 		log.Println("candle adding error")
@@ -94,9 +82,9 @@ func (t *Trader) HandleIncomingCandle(inputCandle *pb.Candle) {
 
 // принятие решения о покупке/продаже при помощи торговой стратегии
 func (t *Trader) selectOperation() OrderSide {
-	if t.ruleStrategy.ShouldEnter(t.series.LastIndex(), t.record) {
+	if t.ruleStrategy.ShouldEnter(t.series.LastIndex(), t.Record) {
 		return BUY
-	} else if t.ruleStrategy.ShouldExit(t.series.LastIndex(), t.record) {
+	} else if t.ruleStrategy.ShouldExit(t.series.LastIndex(), t.Record) {
 		return SELL
 	} else {
 		return HOLD
@@ -104,55 +92,71 @@ func (t *Trader) selectOperation() OrderSide {
 }
 
 // проврека возможности покупки инструмента на счет песочницы
-func (t *Trader) possibleToBuy(price float64, quantity int64) bool {
+func (t *Trader) possibleToBuy(price float64) bool {
 	var totalSum float64
-	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
+	instrumentResp, err := t.sdk.Instruments.GetInstrumentBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
 		Id:     t.Figi,
 	})
 	if err != nil {
 		log.Println(err)
 	}
-	portfolioResp, err := t.sdk.Sandbox.GetSandboxPortfolio(t.sdk.Ctx, &pb.PortfolioRequest{AccountId: t.sdk.TradeConfig.AccountID})
-	if err != nil {
-		log.Println(err)
+	var portfolioResp *pb.PortfolioResponse
+	if t.sdk.TradingMode == s.Sandbox {
+		portfolioResp, err = t.sdk.Sandbox.GetSandboxPortfolio(t.sdk.Ctx, &pb.PortfolioRequest{AccountId: t.sdk.TradeConfig.AccountID})
+		if err != nil {
+			log.Println(err)
+		}
+	} else if t.sdk.TradingMode == s.Real {
+		portfolioResp, err = t.sdk.Operations.GetPortfolio(t.sdk.Ctx, &pb.PortfolioRequest{AccountId: t.sdk.TradeConfig.RealAccountID})
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	// цена 1 инструмента * количество инструментов в лоте * кол-во лотов
-	totalSum = price * float64(quantity) * float64(shareResp.GetInstrument().Lot)
+	totalSum = price * float64(t.sdk.TradeConfig.LotsQuantity) * float64(instrumentResp.GetInstrument().Lot)
 	// если иструмент доступен для торговли на бирже и хватает денег на его покупку
-	return shareResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= totalSum
+	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= totalSum
 }
 
-// проверка аозможности продажи инструмента со счета песочницы
-func (t *Trader) possibleToSell(quantity int64) bool {
-	shareResp, err := t.sdk.Instruments.ShareBy(t.sdk.Ctx, &pb.InstrumentRequest{
+// проверка возможности продажи инструмента со счета песочницы
+func (t *Trader) possibleToSell() bool {
+	instrumentResp, err := t.sdk.Instruments.GetInstrumentBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
 		Id:     t.Figi,
 	})
 	if err != nil {
 		log.Println(err)
 	}
-	positionsResp, err := t.sdk.Sandbox.GetSandboxPositions(t.sdk.Ctx, &pb.PositionsRequest{AccountId: t.sdk.TradeConfig.AccountID})
-	if err != nil {
-		log.Println(err)
+	var positionsResp *pb.PositionsResponse
+	if t.sdk.TradingMode == s.Sandbox {
+		positionsResp, err = t.sdk.Sandbox.GetSandboxPositions(t.sdk.Ctx, &pb.PositionsRequest{AccountId: t.sdk.TradeConfig.AccountID})
+		if err != nil {
+			log.Println(err)
+		}
+	} else if t.sdk.TradingMode == s.Real {
+		positionsResp, err = t.sdk.Operations.GetPositions(t.sdk.Ctx, &pb.PositionsRequest{AccountId: t.sdk.TradeConfig.RealAccountID})
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	contain := false
 	var LotsOnBalance int64
 	for _, p := range positionsResp.Securities {
 		if p.Figi == t.Figi {
 			contain = true
-			LotsOnBalance = p.Balance / int64(shareResp.GetInstrument().Lot)
+			LotsOnBalance = p.Balance / int64(instrumentResp.GetInstrument().Lot)
 			break
 		}
 	}
 	// если инструмент доступен для торговли на бирже, есть ли он у нас и достаточно ли для продажи
-	return shareResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= quantity
+	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= t.sdk.TradeConfig.LotsQuantity
 }
 
-// добавляем исполненные поручения в запись
-func (t *Trader) addTrade(side OrderSide, price float64, amount float64, time time.Time) {
+// AddTrade - добавляем исполненные поручения в запись
+func (t *Trader) AddTrade(side OrderSide, price float64, amount float64, time time.Time) {
 	if side == BUY {
-		t.record.Operate(techan.Order{
+		t.Record.Operate(techan.Order{
 			Side:          techan.BUY,
 			Security:      "testid",
 			Price:         big.NewDecimal(price),
@@ -160,12 +164,44 @@ func (t *Trader) addTrade(side OrderSide, price float64, amount float64, time ti
 			ExecutionTime: time,
 		})
 	} else if side == SELL {
-		t.record.Operate(techan.Order{
+		t.Record.Operate(techan.Order{
 			Side:          techan.SELL,
 			Security:      "testid",
 			Price:         big.NewDecimal(price),
 			Amount:        big.NewDecimal(amount),
 			ExecutionTime: time,
 		})
+	}
+}
+
+func (t *Trader) Buy(quantity int64) {
+	var executedPrice float64
+	var ok bool
+	if t.sdk.TradingMode == s.Sandbox {
+		executedPrice, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
+	} else if t.sdk.TradingMode == s.Real {
+		executedPrice, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
+	}
+	if ok {
+		t.AddTrade(BUY, executedPrice, executedPrice, time.Now())
+		log.Println("Buy order executed with figi", t.Figi, "price =", executedPrice)
+	} else {
+		log.Println("buy order error")
+	}
+}
+
+func (t *Trader) Sell(quantity int64) {
+	var executedPrice float64
+	var ok bool
+	if t.sdk.TradingMode == s.Sandbox {
+		executedPrice, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
+	} else if t.sdk.TradingMode == s.Real {
+		executedPrice, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
+	}
+	if ok {
+		t.AddTrade(SELL, executedPrice, executedPrice, time.Now())
+		log.Println("Sell order executed with figi", t.Figi, "price =", executedPrice)
+	} else {
+		log.Println("sell order error")
 	}
 }

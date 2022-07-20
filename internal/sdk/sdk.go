@@ -12,6 +12,14 @@ import (
 	"log"
 )
 
+type Mode int
+
+const (
+	HistoryTest Mode = iota
+	Sandbox
+	Real
+)
+
 type SDK struct {
 	Ctx         context.Context
 	Conn        *grpc.ClientConn
@@ -25,6 +33,8 @@ type SDK struct {
 	Orders      pb.OrdersServiceClient
 	Stoporder   pb.StopOrdersServiceClient
 	Users       pb.UsersServiceClient
+
+	TradingMode Mode
 }
 
 func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
@@ -47,5 +57,6 @@ func NewSDK(rc *config.RobotConfig, tc *config.TradeConfig) *SDK {
 		Orders:      pb.NewOrdersServiceClient(conn),
 		Stoporder:   pb.NewStopOrdersServiceClient(conn),
 		Users:       pb.NewUsersServiceClient(conn),
+		TradingMode: HistoryTest,
 	}
 }
