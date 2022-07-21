@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
+func ListenCandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	streamClient := pb.NewMarketDataStreamServiceClient(sdk.Conn)
 	marketStream, err := streamClient.MarketDataStream(sdk.Ctx)
 	if err != nil {
@@ -39,7 +39,7 @@ func CandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	for time.Now().Before(stopTime) {
 		resp, err := marketStream.Recv()
 		if err != nil {
-			log.Println(err)
+			log.Fatalln(err)
 		}
 		if resp.GetCandle() != nil {
 			if _, ok := subscribers[resp.GetCandle().GetFigi()]; ok {

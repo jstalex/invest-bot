@@ -10,9 +10,9 @@ func (t *Trader) TestOnHisoricalData(sdk *s.SDK, from string, to string) {
 	for _, hc := range dataset {
 		if t.series.AddCandle(sdk.HistoricalCandleToTechan(hc)) {
 			if t.ruleStrategy.ShouldEnter(t.series.LastIndex(), t.Record) {
-				t.AddTrade(BUY, t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().Period.End)
+				t.AddTrade(BUY, t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().ClosePrice.Float(), "", t.series.LastCandle().Period.End)
 			} else if t.ruleStrategy.ShouldExit(t.series.LastIndex(), t.Record) {
-				t.AddTrade(SELL, t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().Period.End)
+				t.AddTrade(SELL, t.series.LastCandle().ClosePrice.Float(), t.series.LastCandle().ClosePrice.Float(), "", t.series.LastCandle().Period.End)
 			} // else hold instrument
 		} else {
 			fmt.Println("candle adding error")

@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/sdcoffey/techan"
 	pb "invest-bot/api/proto"
 	s "invest-bot/internal/sdk"
 	"invest-bot/internal/trader"
@@ -16,15 +15,22 @@ func Run(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	checkSchedule(sdk)
 	initailBalance := sdk.GetMoneyBalance()
 	// подписаться на свечи инструментов
-	CandlesFromStream(sdk, subscribers)
+	ListenCandlesFromStream(sdk, subscribers)
 	// в конце торговли закрываем все активные позиции
 	finishTradingSession(sdk, subscribers)
 	// вычисляем разницу между начальным балансом на счете и итоговым
 	balanceAfterTrading := sdk.GetMoneyBalance()
 	fmt.Println("Profit after trading session =", balanceAfterTrading-initailBalance, "RUB")
+	// отчет о работе
 	var techanTotalProfit float64 = 0
 	for _, t := range subscribers {
-		techanTotalProfit += techan.TotalProfitAnalysis{}.Analyze(t.Record)
+		positions := t.Record.Trades
+		fmt.Println("Instrument: ", sdk.GetTickerByFigi(t.Figi))
+		for i, p := range positions {
+			fmt.Print("position number ", i, ", ")
+			fmt.Println("Profit:", p.ExitOrder().Amount.Sub(p.EntranceOrder().Amount))
+			techanTotalProfit += p.ExitOrder().Amount.Float() - p.EntranceOrder().Amount.Float()
+		}
 	}
 	fmt.Println("Techan profit =", techanTotalProfit)
 }
@@ -57,7 +63,7 @@ func checkSchedule(sdk *s.SDK) {
 		To:       &timestamp.Timestamp{Seconds: time.Now().Add(time.Hour * 24).Unix(), Nanos: 0},
 	})
 	if err != nil {
-		log.Println("schedule checking error", err)
+		log.Println("schedule checking error:", err)
 	}
 	var tradingDays []*pb.TradingDay
 	for _, sched := range tradingscheduleResp.GetExchanges() {

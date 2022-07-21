@@ -20,18 +20,15 @@ const (
 )
 
 type Trader struct {
-	Figi   string
-	Period int
-
+	Figi         string
+	Period       int
+	Record       *techan.TradingRecord
 	ruleStrategy *techan.RuleStrategy
 	series       *techan.TimeSeries
-	Record       *techan.TradingRecord
-
-	sdk *s.SDK
+	sdk          *s.SDK
 }
 
 func NewTrader(i int, cnf *config.TradeConfig, s *s.SDK) *Trader {
-
 	var ruleStrategy *techan.RuleStrategy
 	var series *techan.TimeSeries
 	var record *techan.TradingRecord
@@ -46,7 +43,6 @@ func NewTrader(i int, cnf *config.TradeConfig, s *s.SDK) *Trader {
 	default:
 		ruleStrategy, series, record = algo.NewEMAStrategy(cnf.Window)
 	}
-
 	return &Trader{
 		Figi:         cnf.TradeInstruments[i],
 		Period:       cnf.Period,
@@ -91,7 +87,7 @@ func (t *Trader) selectOperation() OrderSide {
 	}
 }
 
-// проврека возможности покупки инструмента на счет песочницы
+// проврека возможности покупки инструмента на счет песочницы/реальный
 func (t *Trader) possibleToBuy(price float64) bool {
 	var totalSum float64
 	instrumentResp, err := t.sdk.Instruments.GetInstrumentBy(t.sdk.Ctx, &pb.InstrumentRequest{
@@ -113,13 +109,13 @@ func (t *Trader) possibleToBuy(price float64) bool {
 			log.Println(err)
 		}
 	}
-	// цена 1 инструмента * количество инструментов в лоте * кол-во лотов
+	// сумма = цена 1 инструмента * количество инструментов в лоте * кол-во лотов
 	totalSum = price * float64(t.sdk.TradeConfig.LotsQuantity) * float64(instrumentResp.GetInstrument().Lot)
 	// если иструмент доступен для торговли на бирже и хватает денег на его покупку
 	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= totalSum
 }
 
-// проверка возможности продажи инструмента со счета песочницы
+// проверка возможности продажи инструмента со счета песочницы/реального
 func (t *Trader) possibleToSell() bool {
 	instrumentResp, err := t.sdk.Instruments.GetInstrumentBy(t.sdk.Ctx, &pb.InstrumentRequest{
 		IdType: pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
@@ -153,12 +149,12 @@ func (t *Trader) possibleToSell() bool {
 	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= t.sdk.TradeConfig.LotsQuantity
 }
 
-// AddTrade - добавляем исполненные поручения в запись
-func (t *Trader) AddTrade(side OrderSide, price float64, amount float64, time time.Time) {
+// AddTrade - добавляем исполненные поручения в запись record
+func (t *Trader) AddTrade(side OrderSide, price float64, amount float64, id string, time time.Time) {
 	if side == BUY {
 		t.Record.Operate(techan.Order{
 			Side:          techan.BUY,
-			Security:      "testid",
+			Security:      id,
 			Price:         big.NewDecimal(price),
 			Amount:        big.NewDecimal(amount),
 			ExecutionTime: time,
@@ -166,7 +162,7 @@ func (t *Trader) AddTrade(side OrderSide, price float64, amount float64, time ti
 	} else if side == SELL {
 		t.Record.Operate(techan.Order{
 			Side:          techan.SELL,
-			Security:      "testid",
+			Security:      id,
 			Price:         big.NewDecimal(price),
 			Amount:        big.NewDecimal(amount),
 			ExecutionTime: time,
@@ -174,33 +170,37 @@ func (t *Trader) AddTrade(side OrderSide, price float64, amount float64, time ti
 	}
 }
 
+// Buy - метод покупки инструмента по рыночной цене, сам определяет режим работы бота
 func (t *Trader) Buy(quantity int64) {
-	var executedPrice float64
+	var executedPrice, totalAmount float64
 	var ok bool
+	var id string
 	if t.sdk.TradingMode == s.Sandbox {
-		executedPrice, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
+		executedPrice, totalAmount, id, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
 	} else if t.sdk.TradingMode == s.Real {
-		executedPrice, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
+		executedPrice, totalAmount, id, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_BUY)
 	}
 	if ok {
-		t.AddTrade(BUY, executedPrice, executedPrice, time.Now())
-		log.Println("Buy order executed with figi", t.Figi, "price =", executedPrice)
+		t.AddTrade(BUY, executedPrice, totalAmount, id, time.Now())
+		log.Println("Buy order executed with", t.sdk.GetTickerByFigi(t.Figi), "price =", executedPrice)
 	} else {
 		log.Println("buy order error")
 	}
 }
 
+// Sell - метод продажи инструмента по рыночной цене, сам определяет режим работы бота
 func (t *Trader) Sell(quantity int64) {
-	var executedPrice float64
+	var executedPrice, totalAmount float64
 	var ok bool
+	var id string
 	if t.sdk.TradingMode == s.Sandbox {
-		executedPrice, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
+		executedPrice, totalAmount, id, ok = t.sdk.PostSandboxOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
 	} else if t.sdk.TradingMode == s.Real {
-		executedPrice, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
+		executedPrice, totalAmount, id, ok = t.sdk.PostMarketOrder(t.Figi, quantity, pb.OrderDirection_ORDER_DIRECTION_SELL)
 	}
 	if ok {
-		t.AddTrade(SELL, executedPrice, executedPrice, time.Now())
-		log.Println("Sell order executed with figi", t.Figi, "price =", executedPrice)
+		t.AddTrade(SELL, executedPrice, totalAmount, id, time.Now())
+		log.Println("Sell order executed with", t.sdk.GetTickerByFigi(t.Figi), "price =", executedPrice)
 	} else {
 		log.Println("sell order error")
 	}

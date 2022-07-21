@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 	pb "invest-bot/api/proto"
 	"invest-bot/internal/config"
@@ -21,7 +22,8 @@ func (s *SDK) GetHistoricalCandles(figi string, period int, from string, to stri
 	}
 	return response.GetCandles()
 }
-func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, bool) {
+func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, float64, string, bool) {
+	orderID := uuid.NewString()
 	resp, err := s.Sandbox.PostSandboxOrder(s.Ctx, &pb.PostOrderRequest{
 		Figi:      figi,
 		Quantity:  quantity,
@@ -29,13 +31,15 @@ func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDi
 		Direction: direction,
 		AccountId: s.TradeConfig.AccountID,
 		OrderType: pb.OrderType_ORDER_TYPE_MARKET,
-		OrderId:   "testid",
+		OrderId:   orderID,
 	})
 	if err != nil {
 		log.Println("sandbox post order error:", err)
+		return 0, 0, "", false
 	}
 	ok := resp.ExecutionReportStatus == pb.OrderExecutionReportStatus_EXECUTION_REPORT_STATUS_FILL
-	return s.MoneyValueToFloat(resp.TotalOrderAmount), ok
+	executedInstrumentPrice := s.MoneyValueToFloat(resp.ExecutedOrderPrice) // / float64(quantity)
+	return executedInstrumentPrice, s.MoneyValueToFloat(resp.TotalOrderAmount), orderID, ok
 }
 
 func (s *SDK) GetLotsByFigi(figi string) int64 {
@@ -49,6 +53,8 @@ func (s *SDK) GetLotsByFigi(figi string) int64 {
 	}
 	return int64(instrumentResp.GetInstrument().Lot)
 }
+
+// CreateAccountIDs - если в конфиге нет id аккаунта песочницы/реального, то он откроется/запросится и запишется в конфиг
 func (s *SDK) CreateAccountIDs(tc *config.TradeConfig) {
 	if tc.AccountID == "" {
 		fmt.Println("Sandbox account id field is empty in tradeconfig")
@@ -66,8 +72,9 @@ func (s *SDK) CreateAccountIDs(tc *config.TradeConfig) {
 		err = os.WriteFile("config.yaml", cnf, 0666)
 		if err != nil {
 			log.Println(err)
+		} else {
+			fmt.Println("Account ID was successfully created")
 		}
-		fmt.Println("Account ID was successfully created")
 	}
 	if tc.RealAccountID == "" {
 		fmt.Println("Real account id field is empty in tradeconfig")
@@ -89,10 +96,13 @@ func (s *SDK) CreateAccountIDs(tc *config.TradeConfig) {
 		err = os.WriteFile("config.yaml", cnf, 0666)
 		if err != nil {
 			log.Println(err)
+		} else {
+			fmt.Println("Real account ID was successfully saved")
 		}
-		fmt.Println("Real account ID was successfully saved")
 	}
 }
+
+// GetMoneyBalance - метод получения баланса счета реального/песочницы
 func (s *SDK) GetMoneyBalance() int64 {
 	var positionsResp *pb.PositionsResponse
 	var err error
@@ -111,7 +121,7 @@ func (s *SDK) GetMoneyBalance() int64 {
 	var balance int64 = 0
 	for _, m := range positionsResp.GetMoney() {
 		if m.Currency == "rub" {
-			balance = m.Units
+			balance = m.GetUnits()
 			wasFound = true
 		}
 	}
@@ -120,7 +130,10 @@ func (s *SDK) GetMoneyBalance() int64 {
 	}
 	return balance
 }
-func (s *SDK) PostMarketOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, bool) {
+
+// PostMarketOrder - выставление заявки по рыночной цене на реальном счете
+func (s *SDK) PostMarketOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, float64, string, bool) {
+	orderID := uuid.NewString()
 	resp, err := s.Orders.PostOrder(s.Ctx, &pb.PostOrderRequest{
 		Figi:      figi,
 		Quantity:  quantity,
@@ -128,11 +141,25 @@ func (s *SDK) PostMarketOrder(figi string, quantity int64, direction pb.OrderDir
 		Direction: direction,
 		AccountId: s.TradeConfig.RealAccountID,
 		OrderType: pb.OrderType_ORDER_TYPE_MARKET,
-		OrderId:   "testid",
+		OrderId:   orderID,
 	})
 	if err != nil {
 		log.Println("Market post order error:", err)
+		return 0, 0, "", false
 	}
 	ok := resp.ExecutionReportStatus == pb.OrderExecutionReportStatus_EXECUTION_REPORT_STATUS_FILL
-	return s.MoneyValueToFloat(resp.TotalOrderAmount), ok
+	executedInstrumentPrice := s.MoneyValueToFloat(resp.ExecutedOrderPrice) // / float64(quantity)
+	return executedInstrumentPrice, s.MoneyValueToFloat(resp.TotalOrderAmount), orderID, ok
+}
+
+func (s *SDK) GetTickerByFigi(figi string) string {
+	instrumentResp, err := s.Instruments.GetInstrumentBy(s.Ctx, &pb.InstrumentRequest{
+		IdType:    pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
+		ClassCode: "",
+		Id:        figi,
+	})
+	if err != nil {
+		log.Println("ticker getting error:", err)
+	}
+	return instrumentResp.GetInstrument().Ticker
 }
