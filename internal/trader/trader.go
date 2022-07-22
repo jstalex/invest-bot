@@ -56,6 +56,7 @@ func NewTrader(i int, cnf *config.TradeConfig, s *s.SDK) *Trader {
 // LoadTradersFromConfig - создание экземпляров трейдеров для каждого инструмента из конфига
 func LoadTradersFromConfig(s *s.SDK, cnf *config.TradeConfig) map[string]*Trader {
 	traders := make(map[string]*Trader)
+	// тут вместо строки с фиги передается ее индекс в слайсе инструментов конфига
 	for i, f := range cnf.TradeInstruments {
 		traders[f] = NewTrader(i, cnf, s)
 	}
@@ -112,7 +113,7 @@ func (t *Trader) possibleToBuy(price float64) bool {
 	// сумма = цена 1 инструмента * количество инструментов в лоте * кол-во лотов
 	totalSum = price * float64(t.sdk.TradeConfig.LotsQuantity) * float64(instrumentResp.GetInstrument().Lot)
 	// если иструмент доступен для торговли на бирже и хватает денег на его покупку
-	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) >= totalSum
+	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && t.sdk.MoneyValueToFloat(portfolioResp.GetTotalAmountCurrencies()) > totalSum
 }
 
 // проверка возможности продажи инструмента со счета песочницы/реального
@@ -145,8 +146,9 @@ func (t *Trader) possibleToSell() bool {
 			break
 		}
 	}
+	profitable := t.sdk.GetLastPrice(t.Figi) > t.Record.CurrentPosition().EntranceOrder().Price.Float()
 	// если инструмент доступен для торговли на бирже, есть ли он у нас и достаточно ли для продажи
-	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= t.sdk.TradeConfig.LotsQuantity
+	return instrumentResp.GetInstrument().ApiTradeAvailableFlag && contain && LotsOnBalance >= t.sdk.TradeConfig.LotsQuantity && profitable
 }
 
 // AddTrade - добавляем исполненные поручения в запись record

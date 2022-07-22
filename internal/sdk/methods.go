@@ -22,6 +22,8 @@ func (s *SDK) GetHistoricalCandles(figi string, period int, from string, to stri
 	}
 	return response.GetCandles()
 }
+
+// PostSandboxOrder - выставление поручения в песочнице
 func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDirection) (float64, float64, string, bool) {
 	orderID := uuid.NewString()
 	resp, err := s.Sandbox.PostSandboxOrder(s.Ctx, &pb.PostOrderRequest{
@@ -42,6 +44,7 @@ func (s *SDK) PostSandboxOrder(figi string, quantity int64, direction pb.OrderDi
 	return executedInstrumentPrice, s.MoneyValueToFloat(resp.TotalOrderAmount), orderID, ok
 }
 
+// GetLotsByFigi - получение количества инструментов в 1 лоте
 func (s *SDK) GetLotsByFigi(figi string) int64 {
 	instrumentResp, err := s.Instruments.GetInstrumentBy(s.Ctx, &pb.InstrumentRequest{
 		IdType:    pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
@@ -152,6 +155,7 @@ func (s *SDK) PostMarketOrder(figi string, quantity int64, direction pb.OrderDir
 	return executedInstrumentPrice, s.MoneyValueToFloat(resp.TotalOrderAmount), orderID, ok
 }
 
+// GetTickerByFigi - метод получения тикера по фиги инструмента
 func (s *SDK) GetTickerByFigi(figi string) string {
 	instrumentResp, err := s.Instruments.GetInstrumentBy(s.Ctx, &pb.InstrumentRequest{
 		IdType:    pb.InstrumentIdType_INSTRUMENT_ID_TYPE_FIGI,
@@ -162,4 +166,22 @@ func (s *SDK) GetTickerByFigi(figi string) string {
 		log.Println("ticker getting error:", err)
 	}
 	return instrumentResp.GetInstrument().Ticker
+}
+
+// GetLastPrice - получение последней рыночной цены инструмента
+func (s *SDK) GetLastPrice(figi string) float64 {
+	priceResp, err := s.Marketdata.GetLastPrices(s.Ctx, &pb.GetLastPricesRequest{Figi: s.TradeConfig.TradeInstruments})
+	if err != nil {
+		log.Println("getting last price error", err)
+	}
+	lastPrices := make(map[string]float64, 0)
+	for _, p := range priceResp.GetLastPrices() {
+		lastPrices[p.Figi] = s.QuotationToFloat(p.Price)
+	}
+	if price, ok := lastPrices[figi]; ok {
+		return price
+	} else {
+		log.Println("last price not found")
+		return 0
+	}
 }

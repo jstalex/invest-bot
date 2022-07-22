@@ -21,7 +21,18 @@ func (s *SDK) DateToTimestamp(in string) *timestamp.Timestamp {
 }
 
 func (s *SDK) HistoricalCandleToTechan(hc *pb.HistoricCandle) *techan.Candle {
-	period := techan.NewTimePeriod(hc.Time.AsTime(), time.Minute)
+	minutes := 1
+	switch s.TradeConfig.Period {
+	case 1:
+		minutes = 1
+	case 2:
+		minutes = 5
+	case 3:
+		minutes = 15
+	case 4:
+		minutes = 60
+	}
+	period := techan.NewTimePeriod(hc.Time.AsTime(), time.Duration(minutes)*time.Minute)
 	candle := techan.NewCandle(period)
 	candle.OpenPrice = big.NewDecimal(s.QuotationToFloat(hc.Open))
 	candle.ClosePrice = big.NewDecimal(s.QuotationToFloat(hc.Close))

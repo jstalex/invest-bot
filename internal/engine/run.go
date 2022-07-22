@@ -20,7 +20,7 @@ func Run(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 	finishTradingSession(sdk, subscribers)
 	// вычисляем разницу между начальным балансом на счете и итоговым
 	balanceAfterTrading := sdk.GetMoneyBalance()
-	fmt.Println("Profit after trading session =", balanceAfterTrading-initailBalance, "RUB")
+	fmt.Println("Report:")
 	// отчет о работе
 	var techanTotalProfit float64 = 0
 	for _, t := range subscribers {
@@ -31,8 +31,10 @@ func Run(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 			fmt.Println("Profit:", p.ExitOrder().Amount.Sub(p.EntranceOrder().Amount))
 			techanTotalProfit += p.ExitOrder().Amount.Float() - p.EntranceOrder().Amount.Float()
 		}
+		fmt.Print("\n")
 	}
-	fmt.Println("Techan profit =", techanTotalProfit)
+	fmt.Println("Profit after trading session, by balance =", balanceAfterTrading-initailBalance, "RUB")
+	fmt.Println("Profit after trading session, by trading record =", techanTotalProfit)
 }
 
 // закрытие всех текущих позиций на счете
@@ -59,8 +61,8 @@ func finishTradingSession(sdk *s.SDK, subscribers map[string]*trader.Trader) {
 func checkSchedule(sdk *s.SDK) {
 	tradingscheduleResp, err := sdk.Instruments.TradingSchedules(sdk.Ctx, &pb.TradingSchedulesRequest{
 		Exchange: "MOEX",
-		From:     &timestamp.Timestamp{Seconds: time.Now().Unix(), Nanos: 0},
-		To:       &timestamp.Timestamp{Seconds: time.Now().Add(time.Hour * 24).Unix(), Nanos: 0},
+		From:     &timestamp.Timestamp{Seconds: time.Now().UTC().Unix(), Nanos: 0},
+		To:       &timestamp.Timestamp{Seconds: time.Now().Add(time.Hour * 8).UTC().Unix(), Nanos: 0},
 	})
 	if err != nil {
 		log.Println("schedule checking error:", err)
