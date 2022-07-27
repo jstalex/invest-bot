@@ -50,7 +50,18 @@ func (s *SDK) MoneyValueToFloat(src *pb.MoneyValue) float64 {
 }
 
 func (s *SDK) PBCandleToTechan(pbc *pb.Candle) *techan.Candle {
-	period := techan.NewTimePeriod(pbc.Time.AsTime(), time.Minute)
+	minutes := 1
+	switch s.TradeConfig.Period {
+	case 1:
+		minutes = 1
+	case 2:
+		minutes = 5
+	case 3:
+		minutes = 15
+	case 4:
+		minutes = 60
+	}
+	period := techan.NewTimePeriod(pbc.Time.AsTime(), time.Duration(minutes)*time.Minute)
 	candle := techan.NewCandle(period)
 	candle.OpenPrice = big.NewDecimal(s.QuotationToFloat(pbc.Open))
 	candle.ClosePrice = big.NewDecimal(s.QuotationToFloat(pbc.Close))

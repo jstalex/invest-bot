@@ -17,10 +17,17 @@ func ListenCandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) 
 	}
 	// создание слайса инструментов для зпроса о подписке
 	instruments := make([]*pb.CandleInstrument, 0, 0)
+	subInterval := pb.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE
+	switch sdk.TradeConfig.Period {
+	case 1:
+		subInterval = pb.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE
+	case 2:
+		subInterval = pb.SubscriptionInterval_SUBSCRIPTION_INTERVAL_FIVE_MINUTES
+	}
 	for _, t := range sdk.TradeConfig.TradeInstruments {
 		instruments = append(instruments, &pb.CandleInstrument{
 			Figi:     t,
-			Interval: pb.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE,
+			Interval: subInterval,
 		})
 	}
 	// запрос на подписку
