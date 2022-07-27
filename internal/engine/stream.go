@@ -5,6 +5,7 @@ import (
 	s "invest-bot/internal/sdk"
 	"invest-bot/internal/trader"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -33,24 +34,31 @@ func ListenCandlesFromStream(sdk *s.SDK, subscribers map[string]*trader.Trader) 
 	if err != nil {
 		log.Println(err)
 	}
-	// слушаем стрим и вызываем обработку свечи у, соответсвующего инструменту, трейдера
+	// слушаем стрим определенное время и вызываем обработку свечи у, соответсвующего инструменту, трейдера
 	stopTime := time.Now().Add(time.Duration(sdk.TradeConfig.TradingDuration) * time.Minute)
-	// слушаем стрим определенное из конфига время
+	// функция дождется завершения обработки всех свечей в горутинах
+	var wg sync.WaitGroup
+	var incomingCandle *pb.Candle
 	for time.Now().Before(stopTime) {
 		resp, err := marketStream.Recv()
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if resp.GetCandle() != nil {
-			if _, ok := subscribers[resp.GetCandle().GetFigi()]; ok {
+		incomingCandle = resp.GetCandle()
+		if incomingCandle != nil {
+			if _, ok := subscribers[incomingCandle.GetFigi()]; ok {
 				// вызываем обработку свечи у трейдера
-				go subscribers[resp.GetCandle().GetFigi()].HandleIncomingCandle(resp.GetCandle())
+				wg.Add(1)
+				go func() {
+					subscribers[incomingCandle.GetFigi()].HandleIncomingCandle(incomingCandle)
+					wg.Done()
+				}()
 			} else {
-				log.Println("not found subscriber to instrument ", resp.GetCandle().Figi)
+				log.Println("not found subscriber to instrument ", incomingCandle.GetFigi())
 			}
 		} else {
 			log.Println("response do not contain a candle")
 		}
 	}
-	time.Sleep(time.Second)
+	wg.Wait()
 }

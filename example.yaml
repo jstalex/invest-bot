@@ -1,0 +1,13 @@
+instruments:
+  - BBG004730N88 #sber lot-10
+  - BBG00475KKY8 #novatech lot-1
+  - BBG004RVFCY3 # magnit lot-1
+  - BBG004S681W1 # mts lot-10
+  - BBG004731354 # rosneft lot-1
+id: <sandbox_account_id>
+realAccountID: <real_account_id> # full-access account id
+strategy: classic
+period: 1
+window: 2
+duration: 20
+lotsQuantity: 1
